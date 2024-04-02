@@ -223,16 +223,14 @@ impl Builder {
 #[cfg(test)]
 mod tests {
     use crate::export::trace::SpanData;
-    use crate::resource::{
-        SERVICE_NAME, TELEMETRY_SDK_LANGUAGE, TELEMETRY_SDK_NAME, TELEMETRY_SDK_VERSION,
-    };
+    use crate::resource::tests::{assert_resource, assert_telemetry_resource};
+    use crate::resource::SERVICE_NAME;
     use crate::trace::provider::TracerProviderInner;
     use crate::trace::{Config, Span, SpanProcessor};
     use crate::Resource;
     use opentelemetry::trace::{TraceError, TraceResult};
-    use opentelemetry::{Context, Key, KeyValue, Value};
+    use opentelemetry::{Context, KeyValue};
     use std::borrow::Cow;
-    use std::env;
     use std::sync::Arc;
 
     #[derive(Debug)]
@@ -278,45 +276,15 @@ mod tests {
 
     #[test]
     fn test_tracer_provider_default_resource() {
-        let assert_resource = |provider: &super::TracerProvider,
-                               resource_key: &'static str,
-                               expect: Option<&'static str>| {
-            assert_eq!(
-                provider
-                    .config()
-                    .resource
-                    .get(Key::from_static_str(resource_key))
-                    .map(|v| v.to_string()),
-                expect.map(|s| s.to_string())
-            );
-        };
-        let assert_telemetry_resource = |provider: &super::TracerProvider| {
-            assert_eq!(
-                provider
-                    .config()
-                    .resource
-                    .get(TELEMETRY_SDK_LANGUAGE.into()),
-                Some(Value::from("rust"))
-            );
-            assert_eq!(
-                provider.config().resource.get(TELEMETRY_SDK_NAME.into()),
-                Some(Value::from("opentelemetry"))
-            );
-            assert_eq!(
-                provider.config().resource.get(TELEMETRY_SDK_VERSION.into()),
-                Some(Value::from(env!("CARGO_PKG_VERSION")))
-            );
-        };
-
         // If users didn't provide a resource and there isn't a env var set. Use default one.
         temp_env::with_var_unset("OTEL_RESOURCE_ATTRIBUTES", || {
             let default_config_provider = super::TracerProvider::builder().build();
             assert_resource(
-                &default_config_provider,
+                &default_config_provider.config().resource,
                 SERVICE_NAME,
                 Some("unknown_service"),
             );
-            assert_telemetry_resource(&default_config_provider);
+            assert_telemetry_resource(&default_config_provider.config().resource);
         });
 
         // If user provided a resource, use that.
@@ -329,7 +297,11 @@ mod tests {
                 ..Default::default()
             })
             .build();
-        assert_resource(&custom_config_provider, SERVICE_NAME, Some("test_service"));
+        assert_resource(
+            &custom_config_provider.config().resource,
+            SERVICE_NAME,
+            Some("test_service"),
+        );
         assert_eq!(custom_config_provider.config().resource.len(), 1);
 
         // If `OTEL_RESOURCE_ATTRIBUTES` is set, read them automatically
@@ -339,13 +311,21 @@ mod tests {
             || {
                 let env_resource_provider = super::TracerProvider::builder().build();
                 assert_resource(
-                    &env_resource_provider,
+                    &env_resource_provider.config().resource,
                     SERVICE_NAME,
                     Some("unknown_service"),
                 );
-                assert_resource(&env_resource_provider, "key1", Some("value1"));
-                assert_resource(&env_resource_provider, "k3", Some("value2"));
-                assert_telemetry_resource(&env_resource_provider);
+                assert_resource(
+                    &env_resource_provider.config().resource,
+                    "key1",
+                    Some("value1"),
+                );
+                assert_resource(
+                    &env_resource_provider.config().resource,
+                    "k3",
+                    Some("value2"),
+                );
+                assert_telemetry_resource(&env_resource_provider.config().resource);
                 assert_eq!(env_resource_provider.config().resource.len(), 6);
             },
         );
@@ -365,26 +345,28 @@ mod tests {
                     })
                     .build();
                 assert_resource(
-                    &user_provided_resource_config_provider,
+                    &user_provided_resource_config_provider.config().resource,
                     SERVICE_NAME,
                     Some("unknown_service"),
                 );
                 assert_resource(
-                    &user_provided_resource_config_provider,
+                    &user_provided_resource_config_provider.config().resource,
                     "my-custom-key",
                     Some("my-custom-value"),
                 );
                 assert_resource(
-                    &user_provided_resource_config_provider,
+                    &user_provided_resource_config_provider.config().resource,
                     "my-custom-key2",
                     Some("my-custom-value2"),
                 );
                 assert_resource(
-                    &user_provided_resource_config_provider,
+                    &user_provided_resource_config_provider.config().resource,
                     "k2",
                     Some("value2"),
                 );
-                assert_telemetry_resource(&user_provided_resource_config_provider);
+                assert_telemetry_resource(
+                    &user_provided_resource_config_provider.config().resource,
+                );
                 assert_eq!(
                     user_provided_resource_config_provider
                         .config()

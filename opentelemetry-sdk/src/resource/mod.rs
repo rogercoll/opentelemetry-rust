@@ -257,11 +257,39 @@ pub trait ResourceDetector {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::resource::EnvResourceDetector;
     use std::collections::HashMap;
     use std::time;
+
+    pub(crate) fn assert_resource(
+        resource: &Resource,
+        resource_key: &'static str,
+        expect: Option<&'static str>,
+    ) {
+        assert_eq!(
+            resource
+                .get(Key::from_static_str(resource_key))
+                .map(|v| v.to_string()),
+            expect.map(|s| s.to_string())
+        )
+    }
+
+    pub(crate) fn assert_telemetry_resource(resource: &Resource) {
+        assert_eq!(
+            resource.get(TELEMETRY_SDK_LANGUAGE.into()),
+            Some(Value::from("rust"))
+        );
+        assert_eq!(
+            resource.get(TELEMETRY_SDK_NAME.into()),
+            Some(Value::from("opentelemetry"))
+        );
+        assert_eq!(
+            resource.get(TELEMETRY_SDK_VERSION.into()),
+            Some(Value::from(env!("CARGO_PKG_VERSION")))
+        );
+    }
 
     #[test]
     fn new_resource() {
